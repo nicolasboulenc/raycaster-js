@@ -1,19 +1,19 @@
+
 "use strict"
 
 window.addEventListener("load", window_on_load)
-
 
 let scale = 2
 let canvas = null
 let ctx = null
 let cto = null
-let player = { x: 300, y: 300, dir: -Math.PI/2 }
+let player = { x: 300, y: 300, dir: Math.PI/2 }
 let input = { up: false, down: false, left: false, right: false }
 let timeprev = 0
 
-let mapx = 8
-let mapy = 8
-let maps = 64
+let map_x = 8
+let map_y = 8
+let map_s = 64
 let map = [
 	1, 1, 1, 1, 1, 1, 1, 1,
 	1, 0, 1, 0, 0, 0, 0, 1,
@@ -48,7 +48,7 @@ function window_on_load(evt) {
 
 
 function loop(timestamp) {
-	
+
 	window.requestAnimationFrame(loop)
 	let elapsed = timestamp - timeprev
 	timeprev = timestamp
@@ -56,11 +56,14 @@ function loop(timestamp) {
 	process_input(elapsed)
 
 	// draw on cto
-	cto.fillStyle = "darkblue";
+	cto.fillStyle = "darkblue"
 	cto.fillRect(0, 0, cto.canvas.width, cto.canvas.height)
 
 	drawMap()
 	drawPlayer()
+
+	castrays()
+
 	ctx.drawImage(cto.canvas, 0, 0, cto.canvas.width, cto.canvas.height, 0, 0, canvas.width, canvas.height)
 }
 
@@ -68,10 +71,10 @@ function loop(timestamp) {
 function drawMap() {
 
 	cto.fillStyle = "darkgrey"
-	for(let y=0; y<mapy; y++) {
-		for(let x=0; x<mapx; x++) {
-			if(map[y * mapy + x] !== 0) {
-				cto.fillRect(x * maps / scale + 1, y * maps / scale + 1, maps / scale - 1, maps / scale - 1)
+	for(let y=0; y<map_y; y++) {
+		for(let x=0; x<map_x; x++) {
+			if(map[y * map_y + x] !== 0) {
+				cto.fillRect(x * map_s / scale + 1, y * map_s / scale + 1, map_s / scale - 1, map_s / scale - 1)
 			}
 		}
 	}
@@ -90,7 +93,7 @@ function drawPlayer() {
 
 	cto.beginPath()
 	cto.moveTo(px - 0.5, py)
-	cto.lineTo(px - 0.5 + Math.cos(player.dir) * dir_length, py + Math.sin(player.dir) * dir_length)
+	cto.lineTo(px - 0.5 + Math.cos(player.dir) * dir_length, py + Math.sin(player.dir) * dir_length * -1)
 	cto.stroke()
 
 	cto.fillRect(px - 3, py - 3, 5, 5)
@@ -100,47 +103,60 @@ function drawPlayer() {
 function castrays() {
 
 	// Vertical
-	dof=0; side=0; disV=100000;
-	float Tan=tan(degToRad(ra));
+	let steps = 0
+	let v_dist = 100000
+	let ra = player.dir
+	let dir_tan = Math.tan(ra);
+	let rx, ry
+	let xo, yo
 
 	// looking left
-	if(cos(degToRad(ra))> 0.001) { 
-		rx=(((int)px>>6)<<6)+64;
-		ry=(px-rx)*Tan+py;
-		xo= 64; yo=-xo*Tan;
+	let dir_cos = Math.cos(ra)
+	if(dir_cos > 0.001) {
+		rx = ((player.x >> 6) << 6) + map_s
+		ry = (player.x - rx) * dir_tan + player.y
+		xo = map_s
+		yo = -xo * dir_tan
 	}
 	// looking right
-	else if(cos(degToRad(ra))<-0.001) { 
-		rx=(((int)px>>6)<<6) -0.0001; 
-		ry=(px-rx)*Tan+py; 
-		xo=-64; 
-		yo=-xo*Tan;
+	else if(dir_cos < -0.001) { 
+		rx = ((player.x >> 6) << 6) - 0.0001
+		ry = (player.x - rx) * dir_tan + player.y
+		xo = -map_s
+		yo = -xo * dir_tan
 	}
 	//looking up or down. no hit
 	else { 
-		rx=px; 
-		ry=py; 
-		dof=8;
+		rx = player.x
+		ry = player.y
+		steps = 8
 	}
 
-	while(dof < 8) {
-		mx = (int)(rx)>>6
-		my = (int)(ry)>>6
-		mp = my * mapX + mx
+	while(steps < 8) {
+		let mx = (rx) >> 6
+		let my = (ry) >> 6
+		let mi = my * map_x + mx
 		// hit
-		if(mp>0 && mp<mapX*mapY && map[mp]==1) { 
-			dof = 8
-			disV = cos(degToRad(ra))*(rx-px)-sin(degToRad(ra))*(ry-py)
+		if(mi > 0 && mi < map_x * map_y && map[mi] !== 0) {
+			steps = 8
+			v_dist = Math.cos(ra) * (rx - player.x) - Math.sin(ra) * (ry - player.y)
 		}
 		// check next horizontal
 		else { 
 			rx += xo
 			ry += yo
-			dof += 1
+			steps += 1
 		}
-	} 
-	vx = rx 
-	vy = ry
+	}
+
+	cto.beginPath()
+	cto.moveTo(Math.round(player.x/scale), 	Math.round(player.y/scale))
+	cto.lineTo(Math.round(rx/scale), 		Math.round(ry/scale))
+	cto.stroke()
+
+
+	// vx = rx 
+	// vy = ry
 
 	//---Horizontal---
 	// dof=0; disH=100000;
@@ -151,8 +167,8 @@ function castrays() {
 
 	// while(dof<8) 
 	// { 
-	// mx=(int)(rx)>>6; my=(int)(ry)>>6; mp=my*mapX+mx;                          
-	// if(mp>0 && mp<mapX*mapY && map[mp]==1){ dof=8; disH=cos(degToRad(ra))*(rx-px)-sin(degToRad(ra))*(ry-py);}//hit         
+	// mx=(int)(rx)>>6; my=(int)(ry)>>6; mp=my*map_x+mx;                          
+	// if(mp>0 && mp<map_x*map_y && map[mp]==1){ dof=8; disH=cos(degToRad(ra))*(rx-px)-sin(degToRad(ra))*(ry-py);}//hit         
 	// else{ rx+=xo; ry+=yo; dof+=1;}                                               //check next horizontal
 	// } 
 
@@ -166,18 +182,18 @@ function castrays() {
 function process_input(elapsed) {
 
 	if(input.up === true) {
-		player.y += 10 * Math.sin(player.dir) * elapsed / 100
 		player.x += 10 * Math.cos(player.dir) * elapsed / 100
+		player.y += 10 * Math.sin(player.dir) * elapsed / 100 * -1
 	}
 	if(input.down === true) {
-		player.y -= 10 * Math.sin(player.dir) * elapsed / 100
 		player.x -= 10 * Math.cos(player.dir) * elapsed / 100
+		player.y -= 10 * Math.sin(player.dir) * elapsed / 100 * -1
 	}
 	if(input.left === true) {
-		player.dir -= 0.25 * elapsed / 100
+		player.dir += 0.25 * elapsed / 100
 	}
 	if(input.right === true) {
-		player.dir += 0.25 * elapsed / 100
+		player.dir -= 0.25 * elapsed / 100
 	}
 }
 
@@ -199,7 +215,6 @@ function window_onkeydown(evt) {
 
 
 function window_onkeyup(evt) {
-	console.log(evt)
 	if(evt.code === "ArrowUp" || evt.code === "KeyW") {
 		input.up = false
 	}
