@@ -11,8 +11,8 @@ let player = { x: 300, y: 300, dir: Math.PI/2 }
 let input = { up: false, down: false, left: false, right: false }
 let timeprev = 0
 
-let map_x = 8
-let map_y = 8
+let map_w = 8
+let map_h = 8
 let map_s = 64
 let map = [
 	1, 1, 1, 1, 1, 1, 1, 1,
@@ -41,6 +41,7 @@ function window_on_load(evt) {
 	ctx.imageSmoothingEnabled = false
 
 	cto = new OffscreenCanvas(canvas.width/scale, canvas.height/scale).getContext("2d")
+	cto.imageSmoothingEnabled = false
 
 	timeprev = Date.now()
 	loop()
@@ -71,9 +72,9 @@ function loop(timestamp) {
 function drawMap() {
 
 	cto.fillStyle = "darkgrey"
-	for(let y=0; y<map_y; y++) {
-		for(let x=0; x<map_x; x++) {
-			if(map[y * map_y + x] !== 0) {
+	for(let y=0; y<map_h; y++) {
+		for(let x=0; x<map_w; x++) {
+			if(map[y * map_h + x] !== 0) {
 				cto.fillRect(x * map_s / scale + 1, y * map_s / scale + 1, map_s / scale - 1, map_s / scale - 1)
 			}
 		}
@@ -102,106 +103,122 @@ function drawPlayer() {
 
 function castrays() {
 
-	// Vertical
-	let steps = 0
-	let v_dist = 100000
-	let ra = player.dir
-	let dir_tan = Math.tan(ra);
-	let rx, ry
-	let xo, yo
+	const max_len = Math.max(map_w * map_s, map_h * map_s)
+	const epsilon = 0.0001
 
-	// looking left
-	let dir_cos = Math.cos(ra)
-	if(dir_cos > 0.001) {
-		rx = (Math.floor(player.x / map_s) * map_s) + map_s
-		ry = (player.x - rx) * dir_tan + player.y
-		xo = map_s
-		yo = -xo * dir_tan
-	}
-	// looking right
-	else if(dir_cos < -0.001) {
-		rx = (Math.floor(player.x / map_s) * map_s) - 0.0001
-		ry = (player.x - rx) * dir_tan + player.y
-		xo = -map_s
-		yo = -xo * dir_tan
-	}
-	//looking up or down. no hit
-	else {
-		rx = player.x
-		ry = player.y
-		steps = 8
-	}
-
-	while(steps < 8) {
-		let mx = Math.floor(rx / map_s)
-		let my = Math.floor(ry / map_s)
-		let mi = my * map_x + mx
-		// hit
-		if(mi > 0 && mi < map_x * map_y && map[mi] !== 0) {
-			steps = 8
-			v_dist = Math.cos(ra) * (rx - player.x) - Math.sin(ra) * (ry - player.y)
-		}
-		// check next horizontal
-		else {
-			rx += xo
-			ry += yo
-			steps += 1
-		}
-	}
-
-	// Horizontal
-	steps = 0
-	let h_dist = 100000
+	let ray_rad = player.dir
+	let dir_tan = Math.tan(ray_rad)
 	let dir_inv_tan = 1.0 / dir_tan
-	if(Math.sin(ra) > 0.001) {
-		ry = Math.floor(player.y / map_s) * map_s - 0.0001
-		rx = (player.y - ry) * dir_inv_tan + player.x
-		yo = -map_s
-		xo = -yo * dir_inv_tan
+	let dir_cos = Math.cos(ray_rad)
+	let dir_sin = Math.sin(ray_rad)
+
+
+	// Ray that check vertical intersections
+	let ray_ver = {	x: 0, y: 0, x_step: 0, y_step: 0, len: 0, has_hit: false }
+
+	if(dir_cos > epsilon) {
+		// looking left
+		ray_ver.x = (Math.floor(player.x / map_s) * map_s) + map_s
+		ray_ver.y = (player.x - ray_ver.x) * dir_tan + player.y
+		ray_ver.x_step = map_s
+		ray_ver.y_step = -ray_ver.x_step * dir_tan
+		ray_ver.len = dir_cos * (ray_ver.x - player.x) - dir_sin * (ray_ver.y - player.y)
 	}
-	//looking up
-	else if(Math.sin(ra) < -0.001) {
-		ry = Math.floor(player.y / map_s) * map_s + map_s
-		rx = (player.y - ry) * dir_inv_tan + player.x
-		yo = map_s
-		xo = -yo * dir_inv_tan
+	else if(dir_cos < -epsilon) {
+		// looking right
+		ray_ver.x = (Math.floor(player.x / map_s) * map_s) - epsilon
+		ray_ver.y = (player.x - ray_ver.x) * dir_tan + player.y
+		ray_ver.x_step = -map_s
+		ray_ver.y_step = -ray_ver.x_step * dir_tan
+		ray_ver.len = dir_cos * (ray_ver.x - player.x) - dir_sin * (ray_ver.y - player.y)
 	}
-	//looking down
 	else {
-		rx = player.x
-		ry = player.y
-		dof = 8
-	}
-
-	while(steps < 8) {
-		let mx = Math.floor(rx / map_s)
-		let my = Math.floor(ry / map_s)
-		let mp = my * map_x + mx
-		if(mp > 0 && mp < map_x * map_y && map[mp] == 1) {
-			steps = 8
-			h_dist = Math.cos(ra) * (rx - player.x) - Math.sin(ra) * (ry - player.y)
-		}
-		else{
-			rx += xo
-			ry += yo
-			steps += 1
-		}
+		// looking up or down. no hit
+		ray_ver.x = player.x
+		ray_ver.y = player.y
+		ray_ver.len = max_len
 	}
 
 
-	
+	// Ray that check vertical intersections
+	let ray_hor = {	x: 0, y: 0, x_step: 0, y_step: 0, len: 0, has_hit: false }
+
+	if(dir_sin > epsilon) {
+		// looking up
+		ray_hor.y = Math.floor(player.y / map_s) * map_s - epsilon
+		ray_hor.x = (player.y - ray_hor.y) * dir_inv_tan + player.x
+		ray_hor.y_step = -map_s
+		ray_hor.x_step = -ray_hor.y_step * dir_inv_tan
+		ray_hor.len = dir_cos * (ray_hor.x - player.x) - dir_sin * (ray_hor.y - player.y)
+	}
+	else if(dir_sin < -epsilon) {
+		//looking down
+		ray_hor.y = Math.floor(player.y / map_s) * map_s + map_s
+		ray_hor.x = (player.y - ray_hor.y) * dir_inv_tan + player.x
+		ray_hor.y_step = map_s
+		ray_hor.x_step = -ray_hor.y_step * dir_inv_tan
+		ray_hor.len = dir_cos * (ray_hor.x - player.x) - dir_sin * (ray_hor.y - player.y)
+	}
+	else {
+		ray_hor.x = player.x
+		ray_hor.y = player.y
+		ray_hor.len = max_len
+	}
+
+
+	let ray_cur = ray_ver
+	while(true) {
+
+		if(ray_ver.has_hit) {
+			ray_cur = ray_hor
+		}
+		else if(ray_hor.has_hit) {
+			ray_cur = ray_ver
+		}
+		else if(ray_hor.len < ray_ver.len) {
+			ray_cur = ray_hor
+		}
+		else {
+			ray_cur = ray_ver
+		}
+
+		let map_x = Math.floor(ray_cur.x / map_s)
+		let map_y = Math.floor(ray_cur.y / map_s)
+		let map_idx = map_y * map_w + map_x
+
+		if(map_idx > 0 && map_idx < map_w * map_h && map[map_idx] !== 0) {
+			// hit
+			ray_cur.has_hit = true
+			ray_cur.len = dir_cos * (ray_cur.x - player.x) - dir_sin * (ray_cur.y - player.y)
+		}
+		else if(map_x >= 0 && map_x < map_w && map_y >= 0 && map_y < map_h) {
+			ray_cur.x += ray_cur.x_step
+			ray_cur.y += ray_cur.y_step
+			ray_cur.len = dir_cos * (ray_cur.x - player.x) - dir_sin * (ray_cur.y - player.y)
+		}
+		else {
+			// outside level?
+			ray_cur.len = max_len
+		}
+
+		if(ray_ver.has_hit && ray_ver.len < ray_hor.len) break;
+		if(ray_hor.has_hit && ray_hor.len < ray_ver.len) break;
+		if(ray_ver.has_hit && ray_hor.has_hit) break;
+		if(ray_ver.len >= max_len && ray_hor.len >= max_len) break; // can this happen? if outside level?
+	}
+
 	cto.strokeStyle = "red"
 	cto.lineWidth = 4
 	cto.beginPath()
 	cto.moveTo(Math.round(player.x / scale), 	Math.round(player.y / scale))
-	cto.lineTo(Math.round(rx / scale), 		Math.round(ry / scale))
+	cto.lineTo(Math.round(ray_ver.x / scale), 	Math.round(ray_ver.y / scale))
 	cto.stroke()
 
 	cto.strokeStyle = "green"
 	cto.lineWidth = 2
 	cto.beginPath()
 	cto.moveTo(Math.round(player.x / scale), 	Math.round(player.y / scale))
-	cto.lineTo(Math.round(rx / scale), 		Math.round(ry / scale))
+	cto.lineTo(Math.round(ray_hor.x / scale),	Math.round(ray_hor.y / scale))
 	cto.stroke()
 }
 
