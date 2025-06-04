@@ -27,7 +27,7 @@ let map = [
 
 
 function window_on_load(evt) {
-	
+
 	canvas = document.querySelector("canvas")
 	canvas.width = canvas.clientWidth
 	canvas.height = canvas.clientHeight
@@ -119,14 +119,14 @@ function castrays() {
 		yo = -xo * dir_tan
 	}
 	// looking right
-	else if(dir_cos < -0.001) { 
+	else if(dir_cos < -0.001) {
 		rx = (Math.floor(player.x / map_s) * map_s) - 0.0001
 		ry = (player.x - rx) * dir_tan + player.y
 		xo = -map_s
 		yo = -xo * dir_tan
 	}
 	//looking up or down. no hit
-	else { 
+	else {
 		rx = player.x
 		ry = player.y
 		steps = 8
@@ -142,24 +142,15 @@ function castrays() {
 			v_dist = Math.cos(ra) * (rx - player.x) - Math.sin(ra) * (ry - player.y)
 		}
 		// check next horizontal
-		else { 
+		else {
 			rx += xo
 			ry += yo
 			steps += 1
 		}
 	}
 
-	cto.beginPath()
-	cto.moveTo(Math.round(player.x / scale), 	Math.round(player.y / scale))
-	cto.lineTo(Math.round(rx / scale), 		Math.round(ry / scale))
-	cto.stroke()
-
-
-	// vx = rx 
-	// vy = ry
-
 	// Horizontal
-	dof = 0
+	steps = 0
 	let h_dist = 100000
 	let dir_inv_tan = 1.0 / dir_tan
 	if(Math.sin(ra) > 0.001) {
@@ -168,11 +159,11 @@ function castrays() {
 		yo = -map_s
 		xo = -yo * dir_inv_tan
 	}
-	//looking up 
-	else if(Math.sin(ra) < -0.001) { 
+	//looking up
+	else if(Math.sin(ra) < -0.001) {
 		ry = Math.floor(player.y / map_s) * map_s + map_s
 		rx = (player.y - ry) * dir_inv_tan + player.x
-		yo = map_s 
+		yo = map_s
 		xo = -yo * dir_inv_tan
 	}
 	//looking down
@@ -180,21 +171,38 @@ function castrays() {
 		rx = player.x
 		ry = player.y
 		dof = 8
-	}                                                   //looking straight left or right
+	}
 
-	while(dof<8) {
-		mx = Math.floor(rx / 64) 
-		my=(ry)>>6; 
-		mp=my*map_x+mx;                          
-		if(mp>0 && mp<map_x*map_y && map[mp]==1){ dof=8; h_dist=cos(degToRad(ra))*(rx-player.x)-sin(degToRad(ra))*(ry-player.y);}//hit         
-		else{ rx+=xo; ry+=yo; dof+=1;}                                               //check next horizontal
-	} 
+	while(steps < 8) {
+		let mx = Math.floor(rx / map_s)
+		let my = Math.floor(ry / map_s)
+		let mp = my * map_x + mx
+		if(mp > 0 && mp < map_x * map_y && map[mp] == 1) {
+			steps = 8
+			h_dist = Math.cos(ra) * (rx - player.x) - Math.sin(ra) * (ry - player.y)
+		}
+		else{
+			rx += xo
+			ry += yo
+			steps += 1
+		}
+	}
 
 
-	glColor3f(0,0.8,0);
-	if(disV<h_dist){ rx=vx; ry=vy; h_dist=disV; glColor3f(0,0.6,0);}                  //horizontal hit first
-	glLineWidth(2); glBegin(GL_LINES); glVertex2i(player.x,player.y); glVertex2i(rx,ry); glEnd();//draw 2D ray
-    
+	
+	cto.strokeStyle = "red"
+	cto.lineWidth = 4
+	cto.beginPath()
+	cto.moveTo(Math.round(player.x / scale), 	Math.round(player.y / scale))
+	cto.lineTo(Math.round(rx / scale), 		Math.round(ry / scale))
+	cto.stroke()
+
+	cto.strokeStyle = "green"
+	cto.lineWidth = 2
+	cto.beginPath()
+	cto.moveTo(Math.round(player.x / scale), 	Math.round(player.y / scale))
+	cto.lineTo(Math.round(rx / scale), 		Math.round(ry / scale))
+	cto.stroke()
 }
 
 
