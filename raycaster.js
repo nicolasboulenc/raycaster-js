@@ -156,7 +156,7 @@ function drawLevel(rays) {
 	let x = 0
 	for(let ray of rays) {
 		let dst = ray.dst * Math.cos(player.dir - ray.a)
-		let h = Math.floor(60 / dst * 100)
+		let h = Math.floor(map_s / dst * res.h)
 		let y0 = Math.floor((res.h - h) / 2)
 		let y1 = y0 + h
 		// let color = { r: 100, g: 0, b: 0, a: 255 }
