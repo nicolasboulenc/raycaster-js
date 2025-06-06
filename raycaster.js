@@ -13,7 +13,7 @@ let ctx = null
 let cto_map = null		// buffer to draw map on
 let cto_render = null	// buffer to render level on
 let image_data_render = null
-let player = { x: 300, y: 300, dir: Math.PI/2 }
+let player = { x: 2.5 * 64, y: 352, dir: Math.PI/2 }
 let input = { up: false, down: false, left: false, right: false }
 let timeprev = 0
 
@@ -28,7 +28,7 @@ let map = [
 	1, 1, 1, 1, 1, 1, 1, 1,
 	1, 0, 1, 0, 0, 0, 0, 1,
 	1, 0, 1, 0, 0, 0, 0, 1,
-	1, 0, 1, 0, 0, 0, 0, 1,
+	1, 0, 0, 0, 0, 0, 0, 1,
 	1, 0, 0, 0, 0, 0, 0, 1,
 	1, 0, 0, 0, 0, 1, 0, 1,
 	1, 0, 0, 0, 0, 0, 0, 1,
@@ -156,7 +156,7 @@ function drawLevel(rays) {
 	let x = 0
 	for(let ray of rays) {
 		let dst = ray.dst * Math.cos(player.dir - ray.a)
-		let h = Math.floor(60 / dst * 152)
+		let h = Math.floor(60 / dst * 100)
 		let y0 = Math.floor((res.h - h) / 2)
 		let y1 = y0 + h
 		// let color = { r: 100, g: 0, b: 0, a: 255 }
@@ -164,6 +164,10 @@ function drawLevel(rays) {
 		// if(ray.c === "v") {
 		// 	color = { r: 255, g: 0, b: 0, a: 255 }
 		// }
+
+		if(ray.a > player.dir - 0.0001 && ray.a < player.dir + 0.0001) {
+			console.log(ray.dst)
+		}
 
 		let texture_x = Math.floor(map_s * ray.u)
 		for(let y=y0; y<y1; y++) {
