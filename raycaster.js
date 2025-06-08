@@ -1,7 +1,9 @@
 
 "use strict"
 
-window.addEventListener("load", window_on_load)
+const PLAYER_SPEED 				= 128		// 2 tiles per seconds
+const PLAYER_ROTATION 			= Math.PI
+
 
 let res = { w: 320, h: 200 }
 let fov = Math.PI/2
@@ -13,9 +15,12 @@ let ctx = null
 let cto_map = null		// buffer to draw map on
 let cto_render = null	// buffer to render level on
 let image_data_render = null
+
 let player = { x: 2.5 * 64, y: 352, dir: Math.PI/2 }
 let input = { up: false, down: false, left: false, right: false }
 let timeprev = 0
+let player_rotation_carry_over = 0
+
 
 let image_data_texture = null
 
@@ -34,6 +39,8 @@ let map = [
 	1, 0, 0, 0, 0, 0, 0, 1,
 	1, 1, 1, 1, 1, 1, 1, 1
 ]
+
+window.addEventListener("load", window_on_load)
 
 
 function window_on_load(evt) {
@@ -74,7 +81,7 @@ function update_angles() {
 	angles = []
 
 	let proj_dst = (res.w / 2) / Math.tan(fov / 2)
-	console.log(proj_dst)
+	// console.log(proj_dst)
 
 	for(let i=-res.w/2; i<res.w/2; i++) {
 		let angle = Math.atan2(i, proj_dst)
@@ -192,26 +199,26 @@ function drawLevel2(rays) {
 	image_data_render.data.fill(0)
 	let x = 0
 	for(let ray of rays) {
+
 		let dst = ray.dst * Math.cos(player.dir - ray.a)
 		let h = Math.floor(1 / dst * res.h)
 		let y0 = Math.floor((res.h - h) / 2)
 		let y1 = y0 + h
-		// let color = { r: 100, g: 0, b: 0, a: 255 }
 
-		// if(ray.c === "v") {
-		// 	color = { r: 255, g: 0, b: 0, a: 255 }
-		// }
-
-		if(ray.a > player.dir - 0.0001 && ray.a < player.dir + 0.0001) {
-			console.log(ray.dst)
+		let u = 0
+		if(ray.type === "v") {
+			u = ray.y - Math.floor(ray.y)
+		}
+		else {
+			u = ray.x - Math.floor(cur.x)
 		}
 
-		let texture_x = Math.floor(map_s * ray.u)
+		let texture_x = Math.floor(map_s * u)
 		for(let y=y0; y<y1; y++) {
 
 			let v = (y - y0) / h
 			let texture_y = Math.floor(map_s * v)
-			let texture_i = texture_y * 64 + texture_x
+			let texture_i = texture_y * 384 + texture_x
 			let color = { 
 				r: image_data_texture.data[texture_i * 4 + 0],
 				g: image_data_texture.data[texture_i * 4 + 1],
@@ -398,8 +405,10 @@ function castrays() {
 
 
 function castrays2() {
+
 	const max_dst = Math.max(map_w, map_h)
 	const epsilon = 0.0001
+
 	let rays = []
 	let player_x = player.x / map_s
 	let player_y = player.y / map_s
@@ -413,11 +422,12 @@ function castrays2() {
 		let dir_cos = Math.cos(ray_rad)
 		let dir_sin = Math.sin(ray_rad)
 
+
 		// Ray that check vertical intersections
-		let ray_ver = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, c: "v" }
+		let ray_ver = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, type: "v" }
 
 		if(dir_cos > epsilon) {
-			// looking left
+			// looking right
 			ray_ver.x = Math.floor(player_x) + 1
 			ray_ver.y = (player_x - ray_ver.x) * dir_tan + player_y
 			ray_ver.x_step = 1
@@ -425,7 +435,7 @@ function castrays2() {
 			ray_ver.dst = dir_cos * (ray_ver.x - player_x) - dir_sin * (ray_ver.y - player_y)
 		}
 		else if(dir_cos < -epsilon) {
-			// looking right
+			// looking left
 			ray_ver.x = Math.floor(player_x) - epsilon
 			ray_ver.y = (player_x - ray_ver.x) * dir_tan + player_y
 			ray_ver.x_step = -1
@@ -441,7 +451,7 @@ function castrays2() {
 
 
 		// Ray that check vertical intersections
-		let ray_hor = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, c: "h" }
+		let ray_hor = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, type: "h" }
 
 		if(dir_sin > epsilon) {
 			// looking up
@@ -490,7 +500,6 @@ function castrays2() {
 				// hit
 				ray_cur.has_hit = true
 				ray_cur.dst = dir_cos * (ray_cur.x - player_x) - dir_sin * (ray_cur.y - player_y)
-				ray_cur.u = (ray_cur.x - Math.floor(ray_cur.x)) + (ray_cur.y - Math.floor(ray_cur.y))
 				// ray_cur.c = (map_x + map_y) % 2
 			}
 			else if(map_x >= 0 && map_x < map_w && map_y >= 0 && map_y < map_h) {
@@ -527,19 +536,22 @@ function castrays2() {
 function process_input(elapsed) {
 
 	if(input.up === true) {
-		player.x += 10 * Math.cos(player.dir) * elapsed / 100
-		player.y += 10 * Math.sin(player.dir) * elapsed / 100 * -1
+		player.x += PLAYER_SPEED * Math.cos(player.dir) * elapsed / 1000
+		player.y -= PLAYER_SPEED * Math.sin(player.dir) * elapsed / 1000
 	}
 	if(input.down === true) {
-		player.x -= 10 * Math.cos(player.dir) * elapsed / 100
-		player.y -= 10 * Math.sin(player.dir) * elapsed / 100 * -1
+		player.x -= PLAYER_SPEED * Math.cos(player.dir) * elapsed / 1000
+		player.y += PLAYER_SPEED * Math.sin(player.dir) * elapsed / 1000
 	}
 	if(input.left === true) {
-		player.dir += 0.25 * elapsed / 100
+		let rotation = PLAYER_ROTATION * elapsed / 1000
+		player.dir += rotation
 	}
 	if(input.right === true) {
-		player.dir -= 0.25 * elapsed / 100
+		let rotation = PLAYER_ROTATION * elapsed / 1000
+		player.dir -= rotation
 	}
+	document.getElementById("debug").innerHTML = player.dir
 }
 
 
