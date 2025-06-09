@@ -6,7 +6,8 @@ const PLAYER_ROTATION 			= Math.PI
 
 
 let res = { w: 320, h: 200 }
-let fov = Math.PI/2
+let fov = 1.58
+let proj_dst = 0
 let angles = []
 
 let scale = 2
@@ -41,7 +42,7 @@ let map = [
 ]
 
 window.addEventListener("load", window_on_load)
-
+document.getElementById("fov").addEventListener("input", fov_onchange)
 
 function window_on_load(evt) {
 
@@ -80,7 +81,7 @@ function update_angles() {
 
 	angles = []
 
-	let proj_dst = (res.w / 2) / Math.tan(fov / 2)
+	proj_dst = (res.w / 2) / Math.tan(fov / 2)
 	// console.log(proj_dst)
 
 	for(let i=-res.w/2; i<res.w/2; i++) {
@@ -171,30 +172,33 @@ function drawLevel(rays) {
 	// for pixel to distance calc
 	const fov_tan = Math.tan(fov/2)
 
+	document.getElementById("debug").innerHTML = `fov: ${fov} proj_dst: ${proj_dst}`
+
 	let x = 0
 	for(let ray of rays) {
 
-		let dst = ray.dst * Math.cos(player.dir - ray.a)
+		let dst = ray.dst * Math.cos(player.dir - ray.a) * map_s
 
 		// calculate pixel-length
-		const pixel_length = (dst * map_s) / fov_tan / (res.w/2)
+		const pixel_length = dst * fov_tan / (res.w/2)
 		const h = Math.floor(map_s / pixel_length)
 
-		// let h = Math.floor(1 / dst * res.h)
 		let y0 = Math.floor((res.h - h) / 2)
 		let y1 = y0 + h
 
 		let u = 0
 		if(ray.type === "v") {
 			u = ray.y - Math.floor(ray.y)
+			if(ray.a  > Math.PI/2 || ray.a  < -Math.PI/2) u = 1 - u
 		}
 		else {
 			u = ray.x - Math.floor(ray.x)
+			if(ray.a < 0) u = 1 - u
 		}
 
-		if(ray.a < player.dir + 0.001 && ray.a > player.dir - 0.001) {
-			document.getElementById("debug").innerHTML = `player_dir: ${player.dir.toFixed(3)} text_u: ${u.toFixed(3)}`
-		}
+		// if(ray.a < player.dir + 0.001 && ray.a > player.dir - 0.001) {
+		// 	document.getElementById("debug").innerHTML = `player_dir: ${player.dir.toFixed(3)} text_u: ${u.toFixed(3)}`
+		// }
 
 		let texture_x = Math.floor(map_s * u)
 		for(let y=y0; y<y1; y++) {
@@ -370,12 +374,12 @@ function process_input(elapsed) {
 	if(input.left === true) {
 		let rotation = PLAYER_ROTATION * elapsed / 1000
 		player.dir += rotation
-		player.dir = player.dir % (Math.PI * 2)
+		if(player.dir > Math.PI) player.dir -= Math.PI*2
 	}
 	if(input.right === true) {
 		let rotation = PLAYER_ROTATION * elapsed / 1000
 		player.dir -= rotation
-		player.dir = player.dir % (Math.PI * 2)
+		if(player.dir < -Math.PI) player.dir += Math.PI*2
 	}
 }
 
@@ -412,6 +416,12 @@ function window_onkeyup(evt) {
 	else if(evt.code === "ArrowRight" || evt.code === "KeyD") {
 		input.right = false
 	}
+}
+
+
+function fov_onchange(evt) {
+	fov = parseFloat(document.getElementById("fov").value)
+	update_angles()
 }
 
 
