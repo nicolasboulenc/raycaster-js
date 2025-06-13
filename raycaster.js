@@ -361,6 +361,80 @@ function castrays() {
 }
 
 
+function castrays2() {
+
+	let rays = []
+	let vRayStart = { x: player.x / map_s, y: player.y / map_s }
+	let vMapSize = { x: map_w, y: map_w }
+	let vecMap = map
+
+	for (let angle of angles) {
+
+		let ray_rad = player.dir + angle
+		let vRayDir = { x: Math.cos(ray_rad), y: Math.sin(ray_rad) }
+		let vRayUnitStepSize = { x: Math.sqrt(1 + (vRayDir.y / vRayDir.x) * (vRayDir.y / vRayDir.x)), y: Math.sqrt(1 + (vRayDir.x / vRayDir.y) * (vRayDir.x / vRayDir.y)) }
+		let vMapCheck = { x: Math.floor(vRayStart.x), y: Math.floor(vRayStart.y) }
+		let vRayLength1D = { x: 0, y: 0 }
+		let vStep = { x: 0, y: 0 }
+
+		// Establish Starting Conditions
+		if (vRayDir.x < 0) {
+			vStep.x = -1
+			vRayLength1D.x = (vRayStart.x - vMapCheck.x) * vRayUnitStepSize.x
+		}
+		else {
+			vStep.x = 1
+			vRayLength1D.x = (vMapCheck.x + 1 - vRayStart.x) * vRayUnitStepSize.x
+		}
+
+		if (vRayDir.y < 0) {
+			vStep.y = -1
+			vRayLength1D.y = (vRayStart.y - vMapCheck.y) * vRayUnitStepSize.y
+		}
+		else {
+			vStep.y = 1
+			vRayLength1D.y = (vMapCheck.y + 1 - vRayStart.y) * vRayUnitStepSize.y
+		}
+
+		// Perform "Walk" until collision or range check
+		let bTileFound = false
+		let fMaxDistance = 100.0
+		let fDistance = 0.0
+		while (!bTileFound && fDistance < fMaxDistance)	{
+			// Walk along shortest path
+			if (vRayLength1D.x < vRayLength1D.y) {
+				vMapCheck.x += vStep.x
+				fDistance = vRayLength1D.x
+				vRayLength1D.x += vRayUnitStepSize.x
+			}
+			else {
+				vMapCheck.y += vStep.y
+				fDistance = vRayLength1D.y
+				vRayLength1D.y += vRayUnitStepSize.y
+			}
+
+			// Test tile at new test point
+			if (vMapCheck.x >= 0 && vMapCheck.x < vMapSize.x && vMapCheck.y >= 0 && vMapCheck.y < vMapSize.y) {
+				if (vecMap[vMapCheck.y * vMapSize.x + vMapCheck.x] == 1) {
+					bTileFound = true
+				}
+			}
+		}
+
+		// Calculate intersection location
+		let vIntersection
+		if (bTileFound) {
+			vIntersection = vRayStart + vRayDir * fDistance
+		}
+
+		let ray = {	a: ray_rad, x: (vRayStart.x + vRayDir.x * fDistance), y: (vRayStart.y + vRayDir.y * fDistance), x_step: 0, y_step: 0, dst: fDistance, has_hit: bTileFound }
+		rays.push(ray)
+	}
+
+	return rays
+}
+
+
 function process_input(elapsed) {
 
 	if(input.up === true) {
