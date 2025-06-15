@@ -17,7 +17,7 @@ let cto_map = null		// buffer to draw map on
 let cto_render = null	// buffer to render level on
 let image_data_render = null
 
-let player = { x: 2.5 * 64, y: 352, dir: Math.PI/2 }
+let player = { x: 2.5 * 64, y: 352, dir: Math.PI/4 }
 let input = { up: false, down: false, left: false, right: false }
 let timeprev = 0
 let player_rotation_carry_over = 0
@@ -74,6 +74,9 @@ function window_on_load(evt) {
 
 	timeprev = Date.now()
 	loop()
+	// angles = [0]
+	// castrays()
+	// castrays3()
 }
 
 
@@ -101,7 +104,7 @@ function loop(timestamp) {
 
 	// draw on cto
 
-	const rays = castrays()
+	const rays = castrays3()
 
 	if(draw_map) {
 		cto_map.fillStyle = "darkblue"
@@ -232,6 +235,127 @@ function drawLevel(rays) {
 	cto_render.stroke()
 }
 
+function castrays3() {
+
+	const max_dst = Math.max(map_w, map_h)
+	const epsilon = 0.0001
+
+	let rays = []
+	let player_x = player.x / map_s
+	let player_y = player.y / map_s
+
+	for(let angle of angles) {
+
+		let ray_rad = player.dir - angle
+		let dir_tan = Math.tan(ray_rad)
+		let dir_inv_tan = 1.0 / dir_tan
+		let dir_cos = Math.cos(ray_rad)
+		let dir_sin = Math.sin(ray_rad)
+
+
+		// Ray that check vertical intersections
+		let ray_ver = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, type: "v" }
+
+		if(dir_cos > epsilon) {
+			// looking right
+			ray_ver.x = Math.floor(player_x) + 1
+			ray_ver.y = (player_x - ray_ver.x) * dir_tan + player_y
+			ray_ver.x_step = 1
+			ray_ver.y_step = -ray_ver.x_step * dir_tan
+			ray_ver.dst = dir_cos * (ray_ver.x - player_x) - dir_sin * (ray_ver.y - player_y)
+		}
+		else if(dir_cos < -epsilon) {
+			// looking left
+			ray_ver.x = Math.floor(player_x) - epsilon
+			ray_ver.y = (player_x - ray_ver.x) * dir_tan + player_y
+			ray_ver.x_step = -1
+			ray_ver.y_step = -ray_ver.x_step * dir_tan
+			ray_ver.dst = dir_cos * (ray_ver.x - player_x) - dir_sin * (ray_ver.y - player_y)
+		}
+		else {
+			// looking up or down. no hit
+			ray_ver.x = player_x
+			ray_ver.y = player_y
+			ray_ver.dst = Infinity
+		}
+
+
+		// Ray that check vertical intersections
+		let ray_hor = {	a: ray_rad, x: 0, y: 0, x_step: 0, y_step: 0, dst: 0, has_hit: false, type: "h" }
+
+		if(dir_sin > epsilon) {
+			// looking up
+			ray_hor.y = Math.floor(player_y) - epsilon
+			ray_hor.x = (player_y - ray_hor.y) * dir_inv_tan + player_x
+			ray_hor.y_step = -1
+			ray_hor.x_step = -ray_hor.y_step * dir_inv_tan
+			ray_hor.dst = dir_cos * (ray_hor.x - player_x) - dir_sin * (ray_hor.y - player_y)
+		}
+		else if(dir_sin < -epsilon) {
+			//looking down
+			ray_hor.y = Math.floor(player_y) + 1
+			ray_hor.x = (player_y - ray_hor.y) * dir_inv_tan + player_x
+			ray_hor.y_step = 1
+			ray_hor.x_step = -ray_hor.y_step * dir_inv_tan
+			ray_hor.dst = dir_cos * (ray_hor.x - player_x) - dir_sin * (ray_hor.y - player_y)
+		}
+		else {
+			ray_hor.x = player_x
+			ray_hor.y = player_y
+			ray_hor.dst = Infinity
+		}
+
+		let map_x = Math.floor(player_x)
+		let map_y = Math.floor(player_y)
+		let ray_cur = ray_ver
+		while(true) {
+
+			if(ray_hor.dst < ray_ver.dst) {
+				ray_cur = ray_hor
+			}
+			else {
+				ray_cur = ray_ver
+			}
+
+			let map_idx = map_y * map_w + map_x
+
+			if(map_x >= 0 && map_x < map_w && map_y >= 0 && map_y < map_h && map[map_idx] !== 0) {
+				// hit
+				ray_cur.has_hit = true
+				ray_cur.dst = dir_cos * (ray_cur.x - player_x) - dir_sin * (ray_cur.y - player_y)
+				// ray_cur.c = (map_x + map_y) % 2
+			}
+			else if(map_x >= 0 && map_x < map_w && map_y >= 0 && map_y < map_h) {
+				ray_cur.x += ray_cur.x_step
+				ray_cur.y += ray_cur.y_step
+				ray_cur.dst = dir_cos * (ray_cur.x - player_x) - dir_sin * (ray_cur.y - player_y)
+			}
+			else {
+				// outside level?
+				ray_cur.dst = Infinity
+			}
+
+			if(ray_ver.has_hit && ray_ver.dst < ray_hor.dst) {
+				rays.push(ray_ver)
+				break
+			}
+			if(ray_hor.has_hit && ray_hor.dst < ray_ver.dst) {
+				rays.push(ray_hor)
+				break
+			}
+			if(ray_ver.dst >= max_dst && ray_hor.dst >= max_dst) {
+				// can this happen? if outside level?
+				rays.push(ray_ver)
+				break
+			}
+			// if(ray_ver.has_hit && ray_hor.has_hit) break;
+		}
+	}
+
+	return rays
+
+}
+
 
 function castrays() {
 
@@ -359,7 +483,6 @@ function castrays() {
 
 	return rays
 }
-
 
 function castrays2() {
 
